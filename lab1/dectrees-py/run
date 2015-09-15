@@ -1,0 +1,1 @@
+python lab1.py > enfil.dat && gnuplot -p -e "plot 'enfil.dat' using 1:2 title 'MONK1' with lines, 'enfil.dat' using 1:3 title 'MONK3' with lines" && cat enfil.dat

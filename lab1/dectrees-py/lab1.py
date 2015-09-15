@@ -30,15 +30,17 @@ def partition(data, fraction):
 
 def assignment4(): 
     fractions = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
-    for d in [("monk1", m.monk1), ("monk3", m.monk3)]:
-        print(d[0])
-        l = []
-        for f in fractions:
-            l.append(assignment4helper(d[1], f))
-        maximum = max(l)
-        maxIndices = [i for i, j in enumerate(l) if j == maximum]
-        for i in maxIndices:
-            print("Best fraction %.1f" % fractions[i])
+    dataset = [("monk1", m.monk1, m.monk1test), ("monk3", m.monk3, m.monk3test)]
+    l = []
+    for f in fractions:
+        extraCurry = d.check(assignment4helper(dataset[0][1], f), dataset[0][2])
+        stektLök = d.check(assignment4helper(dataset[1][1], f), dataset[1][2])
+        print("%.2f %.2f %.2f" % (f, 1 - extraCurry, 1 - stektLök))
+        l.append(extraCurry)
+    # maximum = max(l)
+    # maxIndices = [i for i, j in enumerate(l) if j == maximum]
+    # for i in maxIndices:
+    #     print("Best fraction %.1f" % fractions[i])
         
 def assignment4helper(dataset, fraction):
     monk1train, monk1val = partition(dataset, fraction)
@@ -58,8 +60,8 @@ def assignment4helper(dataset, fraction):
                 bestTree = t
                 maxVal = val
         tree = bestTree
-    print("#iterations: %d" % i)
-    return maxVal
+    # print("#iterations: %d" % i)
+    return tree
 
     # print("bestTree:    %s" % bestTree)
     # print("value:       %.2f" % maxVal)
