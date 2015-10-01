@@ -1,7 +1,7 @@
 import monkdata as m
 import dtree as d
 import random
-import drawtree
+# import drawtree
 
 def assignment1():
     print("Assignment 1")
@@ -14,13 +14,13 @@ def assignment2():
             [d.averageGain(m.monk2, a) for a in m.attributes],
             [d.averageGain(m.monk3, a) for a in m.attributes]]
     for i in range(0, 3):
-        print("MONK-%d: %f %f %f %f %f %f" % tuple([i + 1] + l[i]), end=" | ")
+        # print("MONK-%d: %f %f %f %f %f %f" % tuple([i + 1] + l[i]), end=" | ")
         print("Split on: a%d" % (max(enumerate(l[i]), key=lambda p: p[1])[0] + 1))
 
 def assignment3(): 
     for dataset in [(m.monk1, m.monk1test), (m.monk2, m.monk2test), (m.monk3, m.monk3test)]:
         tree = d.buildTree(dataset[0], m.attributes)
-        [print(d.check(tree, dataset[i])) for i in range(0, 2)]
+        # [print(d.check(tree, dataset[i])) for i in range(0, 2)]
 
 def partition(data, fraction):
     ldata = list(data)
@@ -34,8 +34,8 @@ def assignment4():
     l = []
     for f in fractions:
         extraCurry = d.check(assignment4helper(dataset[0][1], f), dataset[0][2])
-        stektLök = d.check(assignment4helper(dataset[1][1], f), dataset[1][2])
-        print("%.2f %.2f %.2f" % (f, 1 - extraCurry, 1 - stektLök))
+        stektLok = d.check(assignment4helper(dataset[1][1], f), dataset[1][2])
+        print("%.2f %.2f %.2f" % (f, 1 - extraCurry, 1 - stektLok))
         l.append(extraCurry)
     # maximum = max(l)
     # maxIndices = [i for i, j in enumerate(l) if j == maximum]
