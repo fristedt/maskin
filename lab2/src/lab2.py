@@ -1,10 +1,15 @@
 from cvxopt.solvers import qp
 from cvxopt.base import matrix
 
-import numpy, pylab, random, math
+import numpy, pylab, random, math, sys
 
 def kernel_linear(x, y):
     return x[0]*y[0] + x[1]*y[1] + 1
+
+def kernel_polynomial(x, y):
+    p = 2
+    return pow(x[0]*y[0] + x[1]*y[1] + 1, p)
+
 def kernel_radial(x, y):
     tup = (x[0] - y[0], x[1] - y[1])
     sigma = 2
@@ -26,9 +31,15 @@ def indicator(datapoint, newalpha, func):
 kernel_func = kernel_radial
 
 def main():
-    classA = [(random.normalvariate(-1.5, 1), random.normalvariate(0.5, 1), 1.0) for i in range(5)] + \
-            [(random.normalvariate(1.5, 1), random.normalvariate(0.5, 1), 1.0) for i in range(5)]
-    classB = [(random.normalvariate(0.0, 0.5), random.normalvariate(-0.5, 0.5), -1.0) for i in range(10)]
+
+    # seed = random.randint(0, sys.maxint)
+    seed = 1625196557218803968
+    random.seed(seed)
+    # print seed
+
+    classA = [(random.normalvariate(-2, 1), random.normalvariate(-2, 1), 1.0) for i in range(10)]# + \
+             # [(random.normalvariate(-2.5, -1.5), random.normalvariate(-2, -1), 1.0) for i in range(5)]
+    classB = [(random.normalvariate(2, 1), random.normalvariate(2, 1), -1.0) for i in range(10)]
 
     data = classA + classB
     random.shuffle(data)
