@@ -43,12 +43,11 @@ def computePrior(labels,W=None):
 # out:    mu - C x d matrix of class means
 #      sigma - d x d x C matrix of class covariances
 def mlParams(X,labels,W=None):
-    # Your code here
-    C = list(set(labels))
+    C = set(labels)
     d = len(X[0])
 
-    mu = [[0] * d] * len(C)
-    sigma = [[[0] * len(C)] * d] * d
+    mu = [[0 for i in range(d)] for j in range(len(C))]
+    sigma = [[[0 for k in xrange(len(C))] for j in xrange(d)] for i in xrange(d)]
 
     for k in C:
         sumMu = 0
@@ -69,9 +68,11 @@ def mlParams(X,labels,W=None):
 
         for i in range(d):
             for j in range(d):
-                sigma[i][j][k] = sumSigma[i][j] / Nk
+                sigma[i][j][k] = (sumSigma[i][j] / Nk)
 
-    return mu, np.array(sigma)
+    sigma = np.array(sigma)
+    print sigma
+    return mu, sigma
 
 # in:      X - N x d matrix of M data points
 #      prior - C x 1 vector of class priors
@@ -80,17 +81,19 @@ def mlParams(X,labels,W=None):
 # out:     h - N x 1 class predictions for test points
 def classify(X,prior,mu,sigma,covdiag=True):
     h = [0] * len(X)
+    # print sigma[:, :, 1]
     for idx, x in enumerate(X):
         delta = [0]*len(prior)
         for k in range(len(prior)):
+            # Example code for solving a psd system
+            L = np.linalg.cholesky(sigma[:, :, k])
+            t = np.linalg.solve(L, np.transpose(x - mu[k]))
+            y = np.linalg.solve(L.H, t)
+            print y
             t1 = -(1.0/2)*np.log(np.abs(sigma[:,:,k]))
-            t2 = -(1.0/2)*(x - mu[k])*()
+            t2 = -(1.0/2)*(x - mu[k])*y
             t3 = np.log(prior(k))
 
-    # Example code for solving a psd system
-    L = np.linalg.cholesky(A)
-    y = np.linalg.solve(L,b)
-    x = np.linalg.solve(L.H,y)
     return h
 
 
@@ -101,7 +104,7 @@ def classify(X,prior,mu,sigma,covdiag=True):
 X, labels = genBlobs(centers=5)
 mu, sigma = mlParams(X,labels)
 classify(X, computePrior(labels), mu, sigma)
-# plotGaussian(X,labels,mu,sigma)
+plotGaussian(X,labels,mu,sigma)
 
 quit()
 
