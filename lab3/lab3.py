@@ -47,7 +47,8 @@ def mlParams(X,labels,W=None):
     d = len(X[0])
 
     mu = [[0 for i in range(d)] for j in range(len(C))]
-    sigma = [[[0 for k in xrange(len(C))] for j in xrange(d)] for i in xrange(d)]
+    # sigma = [[[0 for k in xrange(len(C))] for j in xrange(d)] for i in xrange(d)]
+    sigma = np.zeros(shape=(d, d, len(C)))
 
     for k in C:
         sumMu = 0
@@ -62,16 +63,18 @@ def mlParams(X,labels,W=None):
         for idx, x in enumerate(X):
             if labels[idx] == k:
                 matrix = x - mu[k]
-                for i in range(d):
-                    for j in range(d):
-                        sumSigma[i][j] += matrix[i] * matrix[j]
+                matrix = np.matrix(matrix)
+                sumSigma += (matrix.transpose() * matrix)
+                # for i in range(d):
+                #     for j in range(d):
+                #         sumSigma[i][j] += matrix[i] * matrix[j]
 
-        for i in range(d):
-            for j in range(d):
-                sigma[i][j][k] = (sumSigma[i][j] / Nk)
+        # for i in range(d):
+        #     for j in range(d):
+        #         sigma[i][j][k] = (sumSigma[i][j] / Nk)
+        sigma[:,:,k] = sumSigma / Nk
 
-    sigma = np.array(sigma)
-    # print sigma
+    # sigma = np.array(sigma)
     return mu, sigma
 
 # in:      X - N x d matrix of M data points
@@ -83,23 +86,23 @@ def classify(X,prior,mu,sigma,covdiag=True):
     h = [0] * len(X)
     # print sigma[:, :, 1]
     # print sigma.shape[-2:]
-    print sigma.shape
-    sigma = sigma.reshape(5,2,2)
-    print np.linalg.eigvalsh(sigma) # Alla egenvärden ska vara > 0, så fel värden typ
+    # print sigma.shape
+    # sigma = sigma.reshape(5,2,2)
+    # print np.linalg.eigvalsh(sigma) # Alla egenvärden ska vara > 0, så fel värden typ
     # print sigma
     # print sigma.shape[-2:]
     for idx, x in enumerate(X):
         delta = [0]*len(prior)
         for k in range(len(prior)):
             # Example code for solving a psd system
-            # L = np.linalg.cholesky(sigma[:, :, k])
-            L = np.linalg.cholesky(sigma)
+            # print np.linalg.eigvalsh(sigma[:, :, k])
+            L = np.linalg.cholesky(sigma[:, :, k])
+            # L = np.linalg.cholesky(sigma)
             t = np.linalg.solve(L, np.transpose(x - mu[k]))
-            y = np.linalg.solve(L.H, t)
-            print y
-            t1 = -(1.0/2)*np.log(np.abs(sigma[:,:,k]))
-            t2 = -(1.0/2)*(x - mu[k])*y
-            t3 = np.log(prior(k))
+            y = np.linalg.solve(L.transpose(), t)
+            # t1 = -(1.0/2)*np.log(np.abs(sigma[:,:,k]))
+            # t2 = -(1.0/2)*(x - mu[k])*y
+            # t3 = np.log(prior(k))
 
     return h
 
@@ -111,7 +114,7 @@ def classify(X,prior,mu,sigma,covdiag=True):
 X, labels = genBlobs(centers=5)
 mu, sigma = mlParams(X,labels)
 classify(X, computePrior(labels), mu, sigma)
-plotGaussian(X,labels,mu,sigma)
+# plotGaussian(X,labels,mu,sigma)
 
 quit()
 
