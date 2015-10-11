@@ -71,7 +71,7 @@ def mlParams(X,labels,W=None):
                 sigma[i][j][k] = (sumSigma[i][j] / Nk)
 
     sigma = np.array(sigma)
-    print sigma
+    # print sigma
     return mu, sigma
 
 # in:      X - N x d matrix of M data points
@@ -82,11 +82,18 @@ def mlParams(X,labels,W=None):
 def classify(X,prior,mu,sigma,covdiag=True):
     h = [0] * len(X)
     # print sigma[:, :, 1]
+    # print sigma.shape[-2:]
+    print sigma.shape
+    sigma = sigma.reshape(5,2,2)
+    print np.linalg.eigvalsh(sigma) # Alla egenvärden ska vara > 0, så fel värden typ
+    # print sigma
+    # print sigma.shape[-2:]
     for idx, x in enumerate(X):
         delta = [0]*len(prior)
         for k in range(len(prior)):
             # Example code for solving a psd system
-            L = np.linalg.cholesky(sigma[:, :, k])
+            # L = np.linalg.cholesky(sigma[:, :, k])
+            L = np.linalg.cholesky(sigma)
             t = np.linalg.solve(L, np.transpose(x - mu[k]))
             y = np.linalg.solve(L.H, t)
             print y
