@@ -16,6 +16,7 @@
 # Check out `labfuns.py` if you are interested in the details.
 
 import numpy as np
+import sys
 from scipy import misc
 from imp import reload
 from labfuns import *
@@ -31,7 +32,7 @@ from matplotlib.colors import ColorConverter
 # out: prior - C x 1 vector of class priors
 def computePrior(labels,W=None):
     C = set(labels)
-    prior = [0] * len(C)
+    prior = np.zeros(shape=len(C))
     for k in C:
         Nk = float(len([x for x in labels if x == k]))
         prior[k] = Nk/len(labels)
@@ -46,8 +47,7 @@ def mlParams(X,labels,W=None):
     C = set(labels)
     d = len(X[0])
 
-    mu = [[0 for i in range(d)] for j in range(len(C))]
-    # sigma = [[[0 for k in xrange(len(C))] for j in xrange(d)] for i in xrange(d)]
+    mu = np.zeros(shape=(len(C), d))
     sigma = np.zeros(shape=(d, d, len(C)))
 
     for k in C:
@@ -65,13 +65,7 @@ def mlParams(X,labels,W=None):
                 matrix = x - mu[k]
                 matrix = np.matrix(matrix)
                 sumSigma += (matrix.transpose() * matrix)
-                # for i in range(d):
-                #     for j in range(d):
-                #         sumSigma[i][j] += matrix[i] * matrix[j]
 
-        # for i in range(d):
-        #     for j in range(d):
-        #         sigma[i][j][k] = (sumSigma[i][j] / Nk)
         sigma[:,:,k] = sumSigma / Nk
 
     # sigma = np.array(sigma)
@@ -83,29 +77,33 @@ def mlParams(X,labels,W=None):
 #      sigma - d x d x C matrix of class covariances
 # out:     h - N x 1 class predictions for test points
 def classify(X,prior,mu,sigma,covdiag=True):
-    h = [0] * len(X)
-    # print sigma[:, :, 1]
-    # print sigma.shape[-2:]
-    # print sigma.shape
-    # sigma = sigma.reshape(5,2,2)
-    # print np.linalg.eigvalsh(sigma) # Alla egenvärden ska vara > 0, så fel värden typ
-    # print sigma
-    # print sigma.shape[-2:]
+    N = len(X)
+    C = len(prior)
+    d = len(X[0])
+  
+    h = np.zeros(shape=N)
+    t1 = np.zeros(shape=(C))
+    t3 = np.zeros(shape=(C))
+    L = np.zeros(shape=(C, d, d)) if d > 1 else np.zeros(shape=(C, 2, 2))
+
+    for k in range(C):
+        L[k] = np.linalg.cholesky(sigma[:,:,k])
+        t1[k] = -1 * sum([np.log(L[k,i,i]) for i in range(d)])
+        t3[k] = np.log(prior[k])
+
     for idx, x in enumerate(X):
-        delta = [0]*len(prior)
-        for k in range(len(prior)):
-            # Example code for solving a psd system
-            # print np.linalg.eigvalsh(sigma[:, :, k])
-            L = np.linalg.cholesky(sigma[:, :, k])
-            # L = np.linalg.cholesky(sigma)
-            t = np.linalg.solve(L, np.transpose(x - mu[k]))
-            y = np.linalg.solve(L.transpose(), t)
-            # t1 = -(1.0/2)*np.log(np.abs(sigma[:,:,k]))
-            # t2 = -(1.0/2)*(x - mu[k])*y
-            # t3 = np.log(prior(k))
-
+        lastMax = -sys.maxint - 1
+        delta = np.zeros(shape=C)
+        for k in range(C):
+            b = np.matrix(x - mu[k])
+            v = np.linalg.solve(L[k], b.transpose())
+            y = np.linalg.solve(L[k].transpose(), v)
+            t2 = (-1.0/2) * b * y
+            delta = t1[k] + t2 + t3[k]
+            if delta > lastMax:
+                lastMax = delta
+                h[idx] = k
     return h
-
 
 # ## Test the Maximum Likelihood estimates
 #
@@ -113,10 +111,10 @@ def classify(X,prior,mu,sigma,covdiag=True):
 
 X, labels = genBlobs(centers=5)
 mu, sigma = mlParams(X,labels)
-classify(X, computePrior(labels), mu, sigma)
+# H = classify(X, computePrior(labels), mu, sigma)
 # plotGaussian(X,labels,mu,sigma)
 
-quit()
+# quit()
 
 # ## Boosting functions to implement
 #
