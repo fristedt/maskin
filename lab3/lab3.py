@@ -84,25 +84,47 @@ def classify(X,prior,mu,sigma,covdiag=True):
     h = np.zeros(shape=N)
     t1 = np.zeros(shape=(C))
     t3 = np.zeros(shape=(C))
-    L = np.zeros(shape=(C, d, d)) if d > 1 else np.zeros(shape=(C, 2, 2))
-
     for k in range(C):
-        L[k] = np.linalg.cholesky(sigma[:,:,k])
-        t1[k] = -1 * sum([np.log(L[k,i,i]) for i in range(d)])
         t3[k] = np.log(prior[k])
 
-    for idx, x in enumerate(X):
-        lastMax = -sys.maxint - 1
-        delta = np.zeros(shape=C)
+    if not covdiag:
+        L = np.zeros(shape=(C, d, d)) if d > 1 else np.zeros(shape=(C, 2, 2))
+
         for k in range(C):
-            b = np.matrix(x - mu[k])
-            v = np.linalg.solve(L[k], b.transpose())
-            y = np.linalg.solve(L[k].transpose(), v)
-            t2 = (-1.0/2) * b * y
-            delta = t1[k] + t2 + t3[k]
-            if delta > lastMax:
-                lastMax = delta
-                h[idx] = k
+            L[k] = np.linalg.cholesky(sigma[:,:,k])
+            t1[k] = -1 * sum([np.log(L[k,i,i]) for i in range(d)])
+
+        for idx, x in enumerate(X):
+            lastMax = -sys.maxint - 1
+            delta = np.zeros(shape=C)
+            for k in range(C):
+                b = np.matrix(x - mu[k])
+                v = np.linalg.solve(L[k], b.transpose())
+                y = np.linalg.solve(L[k].transpose(), v)
+                t2 = (-1.0/2) * b * y
+                delta = t1[k] + t2 + t3[k]
+                if delta > lastMax:
+                    lastMax = delta
+                    h[idx] = k
+    else:
+        for i in range(d):
+            for j in range(d):
+                if i != j:
+                    sigma[i][j] = 0
+        for k in range(C):
+            t1[k] = -(1.0/2) * np.log(np.linalg.det(sigma[:,:,k]))
+        for idx, x in enumerate(X):
+            lastMax = -sys.maxint - 1
+            delta = np.zeros(shape=C)
+            for k in range(C):
+                b = np.matrix(x - mu[k])
+                y = np.linalg.solve(sigma[:,:,k], b.transpose())
+                t2 = (-1.0/2) * b * y
+                delta = t1[k] + t2 + t3[k]
+                if delta > lastMax:
+                    lastMax = delta
+                    h[idx] = k
+
     return h
 
 # ## Test the Maximum Likelihood estimates
@@ -218,12 +240,17 @@ def plotBoundary(dataset='iris',split=0.7,doboost=False,boostiter=5,covdiag=True
         prior = computePrior(yTr)
         mu, sigma = mlParams(xTr,yTr)
 
-    xRange = np.arange(np.min(pX[:,0]),np.max(pX[:,0]),0.05)
-    yRange = np.arange(np.min(pX[:,1]),np.max(pX[:,1]),0.05)
+    # step = (np.max(pX[:,0]) - np.min(pX[:,0]))/140
+    step = 0.05
+    xRange = np.arange(np.min(pX[:,0]),np.max(pX[:,0]),step)
+    yRange = np.arange(np.min(pX[:,1]),np.max(pX[:,1]),step)
 
     grid = np.zeros((yRange.size, xRange.size))
 
+    # print len(xRange)
     for (xi, xx) in enumerate(xRange):
+        # if xi % 10 == 0: 
+        #     print xi
         for (yi, yy) in enumerate(yRange):
             if doboost:
                 ## Boosting
@@ -254,5 +281,7 @@ def plotBoundary(dataset='iris',split=0.7,doboost=False,boostiter=5,covdiag=True
 
 # Example usage of the functions
 
-testClassifier(dataset='iris',split=0.7,doboost=False,boostiter=5,covdiag=True)
-plotBoundary(dataset='iris',split=0.7,doboost=False,boostiter=5,covdiag=True)
+ds = 'iris'
+cd = False
+testClassifier(dataset=ds,split=0.7,doboost=False,boostiter=5,covdiag=cd)
+plotBoundary(dataset=ds,split=0.7,doboost=False,boostiter=5,covdiag=cd)
