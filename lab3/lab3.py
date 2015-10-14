@@ -22,6 +22,8 @@ from imp import reload
 from labfuns import *
 from sklearn import decomposition
 from matplotlib.colors import ColorConverter
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # ## Bayes classifier functions to implement
 #
@@ -34,8 +36,15 @@ def computePrior(labels,W=None):
     C = set(labels)
     prior = np.zeros(shape=len(C))
     for k in C:
-        Nk = float(len([x for x in labels if x == k]))
-        prior[k] = Nk/len(labels)
+        if W == None:
+            Nk = float(len([x for x in labels if x == k]))
+            prior[k] = Nk/len(labels)
+        else:
+            for idx, l in enumerate(labels):
+                if l == k:
+                    prior[k] += W[idx]
+
+    assert sum(prior) == 1
     return prior
 
 # Note that you do not need to handle the W argument for this part
@@ -54,17 +63,26 @@ def mlParams(X,labels,W=None):
         sumMu = 0
         for idx, x in enumerate(X):
             if labels[idx] == k:
-                sumMu += x
+                if W == None:
+                    sumMu += x
+                else:
+                    sumMu += x*W[idx]
 
-        Nk = len([x for x in labels if x == k])
+        Nk = 0
+        if W == None:
+            Nk = len([x for x in labels if x == k])
+        else:
+            Nk = [W[idx] for idx, x in enumerate(labels) if x == k]
         mu[k] = sumMu/Nk
 
-        sumSigma = [[0] * d] * d
+        sumSigma = np.zeros(shape=(d, d))
         for idx, x in enumerate(X):
             if labels[idx] == k:
                 matrix = x - mu[k]
                 matrix = np.matrix(matrix)
                 sumSigma += (matrix.transpose() * matrix)
+                if W != None:
+                    sumSigma *= W[idx]
 
         sigma[:,:,k] = sumSigma / Nk
 
@@ -127,16 +145,15 @@ def classify(X,prior,mu,sigma,covdiag=True):
 
     return h
 
+
 # ## Test the Maximum Likelihood estimates
 #
 # Call `genBlobs` and `plotGaussian` to verify your estimates.
 
 X, labels = genBlobs(centers=5)
 mu, sigma = mlParams(X,labels)
-# H = classify(X, computePrior(labels), mu, sigma)
 # plotGaussian(X,labels,mu,sigma)
 
-# quit()
 
 # ## Boosting functions to implement
 #
@@ -150,7 +167,15 @@ mu, sigma = mlParams(X,labels)
 #      sigmas - length T list of sigma as above
 #      alphas - T x 1 vector of vote weights
 def trainBoost(X,labels,T=5,covdiag=True):
-    # Your code here
+    N = len(X)
+    W = np.zeros(shape=(T, N))
+    W[0] += 1.0/N
+    print W
+    quit()
+    for t in T:
+        mu, sigma = mlParams(X, labels, W[t])
+
+
     return priors,mus,sigmas,alphas
 
 # in:       X - N x d matrix of N data points
@@ -240,17 +265,12 @@ def plotBoundary(dataset='iris',split=0.7,doboost=False,boostiter=5,covdiag=True
         prior = computePrior(yTr)
         mu, sigma = mlParams(xTr,yTr)
 
-    # step = (np.max(pX[:,0]) - np.min(pX[:,0]))/140
-    step = 0.05
-    xRange = np.arange(np.min(pX[:,0]),np.max(pX[:,0]),step)
-    yRange = np.arange(np.min(pX[:,1]),np.max(pX[:,1]),step)
+    xRange = np.arange(np.min(pX[:,0]),np.max(pX[:,0]),np.abs(np.max(pX[:,0])-np.min(pX[:,0]))/100.0)
+    yRange = np.arange(np.min(pX[:,1]),np.max(pX[:,1]),np.abs(np.max(pX[:,1])-np.min(pX[:,1]))/100.0)
 
     grid = np.zeros((yRange.size, xRange.size))
 
-    # print len(xRange)
     for (xi, xx) in enumerate(xRange):
-        # if xi % 10 == 0: 
-        #     print xi
         for (yi, yy) in enumerate(yRange):
             if doboost:
                 ## Boosting
@@ -266,7 +286,10 @@ def plotBoundary(dataset='iris',split=0.7,doboost=False,boostiter=5,covdiag=True
     plt.hold(True)
     conv = ColorConverter()
     for (color, c) in zip(colormap, classes):
-        CS = plt.contour(xRange,yRange,(grid==c).astype(float),15,linewidths=0.25,colors=conv.to_rgba_array(color))
+        try:
+            CS = plt.contour(xRange,yRange,(grid==c).astype(float),15,linewidths=0.25,colors=conv.to_rgba_array(color))
+        except ValueError:
+            pass   
         xc = pX[py == c, :]
         plt.scatter(xc[:,0],xc[:,1],marker='o',c=color,s=40,alpha=0.5)
 
@@ -280,8 +303,8 @@ def plotBoundary(dataset='iris',split=0.7,doboost=False,boostiter=5,covdiag=True
 # Call the `testClassifier` and `plotBoundary` functions for this part.
 
 # Example usage of the functions
-
-ds = 'iris'
-cd = False
+# trainBoost(X, labels)
+ds = 'wine'
+cd = True
 testClassifier(dataset=ds,split=0.7,doboost=False,boostiter=5,covdiag=cd)
 plotBoundary(dataset=ds,split=0.7,doboost=False,boostiter=5,covdiag=cd)
