@@ -44,7 +44,6 @@ def computePrior(labels,W=None):
                 if l == k:
                     prior[k] += W[idx]
 
-    assert sum(prior) == 1
     return prior
 
 # Note that you do not need to handle the W argument for this part
@@ -72,7 +71,7 @@ def mlParams(X,labels,W=None):
         if W == None:
             Nk = len([x for x in labels if x == k])
         else:
-            Nk = [W[idx] for idx, x in enumerate(labels) if x == k]
+            Nk = sum([W[idx] for idx, x in enumerate(labels) if x == k])
         mu[k] = sumMu/Nk
 
         sumSigma = np.zeros(shape=(d, d))
@@ -166,17 +165,47 @@ mu, sigma = mlParams(X,labels)
 #         mus - length T list of mu as above
 #      sigmas - length T list of sigma as above
 #      alphas - T x 1 vector of vote weights
-def trainBoost(X,labels,T=5,covdiag=True):
+def trainBoost(X, labels,T=5,covdiag=True):
+    def unix(W):
+        mu, sigma = mlParams(X, labels, W)
+        prior = computePrior(labels, W)
+        hti = [False] * N
+        h = classify(X, prior, mu, sigma, covdiag)
+        e = 0
+        for i in range(N):
+            if h[i] == labels[i]:
+                hti[i] = True
+                e += W[i] 
+        alpha = (1.0/2) * (np.log(1 - e) - np.log(e))
+        return mu, sigma, prior, e, alpha, hti
+
     N = len(X)
+    d = len(X[0])
+    C = len(set(labels))
+
     W = np.zeros(shape=(T, N))
     W[0] += 1.0/N
-    print W
-    quit()
-    for t in T:
-        mu, sigma = mlParams(X, labels, W[t])
 
+    e = np.zeros(shape=(T))
 
-    return priors,mus,sigmas,alphas
+    mu = np.zeros(shape=(T, C, d))
+    sigma = np.zeros(shape=(T, d, d, C))
+    prior = np.zeros(shape=(T, C))
+
+    alpha = np.zeros(shape=T)
+
+    for t in range(1, T):
+        mu[t-1], sigma[t-1], prior[t-1], e[t-1], alpha[t-1], hti = unix(W[t-1])
+        W[t] = W[t-1]
+        for i in range(N):
+            if hti:
+                W[t][i] *= e[t-1]**(-alpha[t-1])
+            else:
+                W[t][i] *= e[t-1]**alpha[t-1]
+        W[t] /= sum(W[t]) # NORMALIZE RECTIFY JUSTIFY
+
+    mu[T-1], sigma[T-1], prior[T-1], e[T-1], alpha[T-1], hti = unix(W[T-1])
+    return prior,mu,sigma,alpha
 
 # in:       X - N x d matrix of N data points
 #      priors - length T list of prior as above
@@ -185,7 +214,27 @@ def trainBoost(X,labels,T=5,covdiag=True):
 #      alphas - T x 1 vector of vote weights
 # out:  yPred - N x 1 class predictions for test points
 def classifyBoost(X,priors,mus,sigmas,alphas,covdiag=True):
-    # Your code here
+    T = len(priors)
+    C = len(priors[0])
+    N = len(X)
+    h = np.zeros(shape=(T, N))
+    for t in range(T):
+        h[t] = classify(X, priors[t], mus[t], sigmas[t])
+
+    c = np.zeros(shape=N)
+    for idx, x in enumerate(X):
+        bestClass = 0
+        lastMax = -sys.maxint - 1
+        for k in range(C):
+            tot = 0
+            for t in range(T):
+                if h[t][idx] == k:
+                    tot += alphas[t]
+            if tot > lastMax:
+                lastMax = tot
+                bestClass = k
+        c[idx] = bestClass
+        
     return c
 
 
@@ -303,8 +352,11 @@ def plotBoundary(dataset='iris',split=0.7,doboost=False,boostiter=5,covdiag=True
 # Call the `testClassifier` and `plotBoundary` functions for this part.
 
 # Example usage of the functions
-# trainBoost(X, labels)
-ds = 'wine'
-cd = True
-testClassifier(dataset=ds,split=0.7,doboost=False,boostiter=5,covdiag=cd)
-plotBoundary(dataset=ds,split=0.7,doboost=False,boostiter=5,covdiag=cd)
+# prior, mu, sigma, alpha = trainBoost(X, labels)
+# print mu
+# quit()
+ds = 'iris'
+cd = False
+boots = True
+testClassifier(dataset=ds,split=0.7,doboost=boots,boostiter=5,covdiag=cd)
+plotBoundary(dataset=ds,split=0.7,doboost=boots,boostiter=5,covdiag=cd)
