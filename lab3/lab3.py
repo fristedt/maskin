@@ -17,6 +17,7 @@
 
 import numpy as np
 import sys
+import math
 from scipy import misc
 from imp import reload
 from labfuns import *
@@ -32,7 +33,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # Note that you do not need to handle the W argument for this part
 # in: labels - N x 1 vector of class labels
 # out: prior - C x 1 vector of class priors
-def computePrior(labels,W=None):
+def computePrior(labels,W=None): 
     C = set(labels)
     prior = np.zeros(shape=len(C))
     for k in C:
@@ -51,42 +52,140 @@ def computePrior(labels,W=None):
 #     labels - N x 1 vector of class labels
 # out:    mu - C x d matrix of class means
 #      sigma - d x d x C matrix of class covariances
-def mlParams(X,labels,W=None):
-    C = set(labels)
+# def mlParams(X,labels,W=None):
+#     C = set(labels)
+#     d = len(X[0])
+
+#     mu = np.zeros(shape=(len(C), d))
+#     sigma = np.zeros(shape=(d, d, len(C)))
+
+#     for k in C:
+#         sumMu = 0
+#         for idx, x in enumerate(X):
+#             if labels[idx] == k:
+#                 if W == None:
+#                     sumMu += x
+#                 else:
+#                     sumMu += x*W[idx]
+
+#         Nk = 0
+#         if W == None:
+#             Nk = len([x for x in labels if x == k])
+#         else:
+#             Nk = sum([W[idx] for idx, x in enumerate(labels) if x == k])
+#         mu[k] = sumMu/Nk
+
+#         sumSigma = np.zeros(shape=(d, d))
+#         for idx, x in enumerate(X):
+#             if labels[idx] == k:
+#                 matrix = x - mu[k]
+#                 matrix = np.matrix(matrix)
+#                 sumSigma += (matrix.transpose() * matrix)
+#                 if W != None:
+#                     sumSigma *= W[idx]
+
+#         sigma[:,:,k] = sumSigma / Nk
+
+#     # sigma = np.array(sigma)
+#     return mu, sigma
+
+def mlParams(X, labels, W=None):
+    c = len(set(labels))
+    n = len(labels)
     d = len(X[0])
+    mu = np.zeros([c, d])
 
-    mu = np.zeros(shape=(len(C), d))
-    sigma = np.zeros(shape=(d, d, len(C)))
+    if W is None:
+        W = np.ones(n)
 
-    for k in C:
-        sumMu = 0
-        for idx, x in enumerate(X):
-            if labels[idx] == k:
-                if W == None:
-                    sumMu += x
-                else:
-                    sumMu += x*W[idx]
+    # print('W', W)
+    for k in range(c):
+        for i in range(d):
+            mu_sum = 0
+            n_sum = 0
+            for ni in range(n):
+                if labels[ni] == k:
+                    mu_sum += X[ni][i] * W[ni]
+                    n_sum += W[ni]
+            mu[k][i] = mu_sum / n_sum
 
-        Nk = 0
-        if W == None:
-            Nk = len([x for x in labels if x == k])
-        else:
-            Nk = sum([W[idx] for idx, x in enumerate(labels) if x == k])
-        mu[k] = sumMu/Nk
+    sigma = np.zeros([d, d, c])
+    for k in range(c):
+        n_sum = 0
+        for ni in range(n):
+            if labels[ni] == k:
+                n_sum += W[ni]
+                subtracted = np.subtract(X[ni], mu[k])
+                sigma[:, :, k] += multiply_matrix(subtracted) * W[ni]
+        sigma[:, :, k] /= n_sum
 
-        sumSigma = np.zeros(shape=(d, d))
-        for idx, x in enumerate(X):
-            if labels[idx] == k:
-                matrix = x - mu[k]
-                matrix = np.matrix(matrix)
-                sumSigma += (matrix.transpose() * matrix)
-                if W != None:
-                    sumSigma *= W[idx]
-
-        sigma[:,:,k] = sumSigma / Nk
-
-    # sigma = np.array(sigma)
     return mu, sigma
+
+
+def multiply_matrix(subtracted):
+    n = len(subtracted)
+    matrix = np.empty([n, n])
+    for i in range(n):
+        for j in range(n):
+            matrix[i][j] = subtracted[i] * subtracted[j]
+    return matrix
+
+
+# in:      X - N x d matrix of M data points
+#      prior - C x 1 vector of class priors
+#         mu - C x d matrix of class means
+#      sigma - d x d x C matrix of class covariances
+# out:     h - N x 1 class predictions for test points
+def classify(X, prior, mu, sigma, covdiag=True):
+    # Your code here
+    # Example code for solving a psd system
+    # L = np.linalg.cholesky(A)
+    # y = np.linalg.solve(L,b)
+    # x = np.linalg.solve(L.H,y)
+    h = np.zeros(len(X))
+    d = len(sigma)
+    n = len(h)
+    c = len(prior)
+
+    if not covdiag:
+        for ni in range(n):
+            highest_delta = None
+            for k in range(c):
+                first_value = 0
+                for i in range(d):
+                    first_value += np.log(sigma[i][i][k])
+                first_value = np.log(np.linalg.det(sigma[:, :, k])) / 2
+                solved_equation = np.transpose(
+                    [solve_equation(sigma[:, :, k], np.transpose(np.subtract(X[ni], mu[k])))])
+                subtracted = np.transpose(np.transpose([np.subtract(X[ni], mu[k])]))
+                second_value = np.dot(subtracted, solved_equation)[0][0]
+                third_value = np.log(prior[k])
+                delta = -first_value - second_value / 2 + third_value
+                if highest_delta is None or delta > highest_delta:
+                    highest_delta = delta
+                    h[ni] = k
+    else:
+        for ni in range(n):
+            highest_delta = None
+            for k in range(c):
+                diag = np.diag(np.diag(sigma[:, :, k]))
+                first_value = np.log(np.linalg.det(diag)) / 2
+                subtract = np.subtract(X[ni], mu[k])
+                second_value = np.dot(np.dot(subtract, np.linalg.inv(diag)), np.transpose(subtract)) / 2
+                third_value = np.log(prior[k])
+                delta = -first_value - second_value / 2 + third_value
+                if highest_delta is None or delta > highest_delta:
+                    highest_delta = delta
+                    h[ni] = k
+
+    return h
+
+
+def solve_equation(A, b):
+    L = np.linalg.cholesky(A)
+    y = np.linalg.solve(L, b)
+    x = np.linalg.solve(np.transpose(L), y)
+    return x
 
 # in:      X - N x d matrix of M data points
 #      prior - C x 1 vector of class priors
@@ -166,46 +265,48 @@ mu, sigma = mlParams(X,labels)
 #      sigmas - length T list of sigma as above
 #      alphas - T x 1 vector of vote weights
 def trainBoost(X, labels,T=5,covdiag=True):
-    def unix(W):
-        mu, sigma = mlParams(X, labels, W)
-        prior = computePrior(labels, W)
-        hti = [False] * N
-        h = classify(X, prior, mu, sigma, covdiag)
-        e = 0
-        for i in range(N):
-            if h[i] == labels[i]:
-                hti[i] = True
-                e += W[i] 
-        alpha = (1.0/2) * (np.log(1 - e) - np.log(e))
-        return mu, sigma, prior, e, alpha, hti
-
     N = len(X)
-    d = len(X[0])
     C = len(set(labels))
+    d = len(X[0])
 
-    W = np.zeros(shape=(T, N))
-    W[0] += 1.0/N
+    priors = np.zeros(shape=(T, C))
+    mus = np.zeros(shape=(T, C, d))
+    sigmas = np.zeros(shape=(T, d, d, C))
+    alphas = np.zeros(T)
 
-    e = np.zeros(shape=(T))
+    W = np.ones(N) / N
+    for t in range(T-1):
+        mus[t], sigmas[t] = mlParams(X, labels, W)
+        priors[t] = computePrior(labels, W)
 
-    mu = np.zeros(shape=(T, C, d))
-    sigma = np.zeros(shape=(T, d, d, C))
-    prior = np.zeros(shape=(T, C))
+        delta = computeDelta(X, priors[t], mus[t], sigmas[t], labels, covdiag)
+        error = sum([W[i]*(1-delta[i]) for i in range(N)])
+        if error == 0:
+            error = 1e-6 # Prevent log(0)
+        alphas[t] = (np.log(1-error) - np.log(error))/2
+        W = [W[i] * math.exp(-alphas[t]) if delta[i] else W[i] * math.exp(alphas[t]) for i in range(N)]
+        W /= sum(W)
 
-    alpha = np.zeros(shape=T)
+    t += 1
+    mus[t], sigmas[t] = mlParams(X, labels, W)
+    priors[t] = computePrior(labels, W)
 
-    for t in range(1, T):
-        mu[t-1], sigma[t-1], prior[t-1], e[t-1], alpha[t-1], hti = unix(W[t-1])
-        W[t] = W[t-1]
-        for i in range(N):
-            if hti:
-                W[t][i] *= e[t-1]**(-alpha[t-1])
-            else:
-                W[t][i] *= e[t-1]**alpha[t-1]
-        W[t] /= sum(W[t]) # NORMALIZE RECTIFY JUSTIFY
+    delta = computeDelta(X, priors[t], mus[t], sigmas[t], labels, covdiag)
+    error = sum([W[i]*delta[i] for i in range(N)])
+    alphas[t] = (np.log(1-error) - np.log(error))/2
 
-    mu[T-1], sigma[T-1], prior[T-1], e[T-1], alpha[T-1], hti = unix(W[T-1])
-    return prior,mu,sigma,alpha
+    return priors,mus,sigmas,alphas
+
+def computeDelta(X, prior, mu, sigma, labels, covdiag):
+    N = len(X)
+    deltas = np.zeros(N)
+    H = classify(X, prior, mu, sigma, covdiag)
+    for idx, h in enumerate(H):
+        if h == labels[idx]:
+            deltas[idx] = 1
+    return deltas
+
+
 
 # in:       X - N x d matrix of N data points
 #      priors - length T list of prior as above
@@ -213,30 +314,49 @@ def trainBoost(X, labels,T=5,covdiag=True):
 #      sigmas - length T list of sigma as above
 #      alphas - T x 1 vector of vote weights
 # out:  yPred - N x 1 class predictions for test points
-def classifyBoost(X,priors,mus,sigmas,alphas,covdiag=True):
-    T = len(priors)
-    C = len(priors[0])
-    N = len(X)
-    h = np.zeros(shape=(T, N))
-    for t in range(T):
-        h[t] = classify(X, priors[t], mus[t], sigmas[t])
+# def classifyBoost(X,priors,mus,sigmas,alphas,covdiag=True):
+#     T = len(priors)
+#     C = len(priors[0])
+#     N = len(X)
+#     h = np.zeros(shape=(T, N))
+#     for t in range(T):
+#         h[t] = classify(X, priors[t], mus[t], sigmas[t])
 
-    c = np.zeros(shape=N)
-    for idx, x in enumerate(X):
-        bestClass = 0
-        lastMax = -sys.maxint - 1
-        for k in range(C):
-            tot = 0
-            for t in range(T):
-                if h[t][idx] == k:
-                    tot += alphas[t]
-            if tot > lastMax:
-                lastMax = tot
-                bestClass = k
-        c[idx] = bestClass
+#     c = np.zeros(shape=N)
+#     for idx, x in enumerate(X):
+#         bestClass = 0
+#         lastMax = -sys.maxint - 1
+#         for k in range(C):
+#             tot = 0
+#             for t in range(T):
+#                 if h[t][idx] == k:
+#                     tot += alphas[t]
+#             if tot > lastMax:
+#                 lastMax = tot
+#                 bestClass = k
+#         c[idx] = bestClass
         
-    return c
+#     return c
 
+def classifyBoost(X, priors, mus, sigmas, alphas, covdiag=True):
+    n = len(X)
+    T = len(alphas)
+    c = len(priors[0])
+    matrix = np.zeros([n, c])
+    for t in range(T):
+        ht = classify(X, priors[t], mus[t], sigmas[t], covdiag)
+        for ni in range(n):
+            matrix[ni][ht[ni]] += alphas[t]
+    yPred = np.empty(n)
+    for ni in range(n):
+        likliest_class = None
+        highest_vote_value = None
+        for ci in range(c):
+            if likliest_class is None or matrix[ni][ci] > highest_vote_value:
+                likliest_class = ci
+                highest_vote_value = matrix[ni][ci]
+        yPred[ni] = likliest_class
+    return yPred
 
 # ## Define our testing function
 #
@@ -355,8 +475,8 @@ def plotBoundary(dataset='iris',split=0.7,doboost=False,boostiter=5,covdiag=True
 # prior, mu, sigma, alpha = trainBoost(X, labels)
 # print mu
 # quit()
-ds = 'iris'
-cd = False
-boots = True
+ds = 'olivetti'
+cd = False 
+boots = True 
 testClassifier(dataset=ds,split=0.7,doboost=boots,boostiter=5,covdiag=cd)
 plotBoundary(dataset=ds,split=0.7,doboost=boots,boostiter=5,covdiag=cd)
